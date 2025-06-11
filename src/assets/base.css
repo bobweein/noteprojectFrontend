@@ -1,0 +1,224 @@
+/* 
+  基础样式文件
+  定义全局变量和基础样式，确保样式的一致性和可维护性
+*/
+
+/* 
+  颜色变量定义
+  从 Vue.js 主题中提取的颜色调色板
+*/
+:root {
+  /* 白色系 */
+  --vt-c-white: #ffffff;
+  --vt-c-white-soft: #f8f8f8;
+  --vt-c-white-mute: #f2f2f2;
+
+  /* 黑色系 */
+  --vt-c-black: #181818;
+  --vt-c-black-soft: #222222;
+  --vt-c-black-mute: #282828;
+
+  /* 靛蓝色 */
+  --vt-c-indigo: #2c3e50;
+
+  /* 分割线颜色 */
+  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
+  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
+  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
+  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
+
+  /* 文本颜色 */
+  --vt-c-text-light-1: var(--vt-c-indigo);
+  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
+  --vt-c-text-dark-1: var(--vt-c-white);
+  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
+
+  /* 主色 */
+  --color-primary: #409eff;    /* 主要颜色 */
+  --color-success: #67c23a;    /* 成功颜色 */
+  --color-warning: #e6a23c;    /* 警告颜色 */
+  --color-danger: #f56c6c;     /* 危险颜色 */
+  --color-info: #909399;       /* 信息颜色 */
+
+  /* 文字颜色 */
+  --color-text-primary: #303133;    /* 主要文字颜色 */
+  --color-text-regular: #606266;    /* 常规文字颜色 */
+  --color-text-secondary: #909399;  /* 次要文字颜色 */
+  --color-text-placeholder: #c0c4cc; /* 占位符文字颜色 */
+
+  /* 边框颜色 */
+  --border-color-base: #dcdfe6;        /* 基础边框颜色 */
+  --border-color-light: #e4e7ed;       /* 浅色边框 */
+  --border-color-lighter: #ebeef5;     /* 更浅的边框 */
+  --border-color-extra-light: #f2f6fc; /* 最浅的边框 */
+
+  /* 背景颜色 */
+  --background-color-base: #f5f7fa;    /* 基础背景色 */
+  --background-color-white: #ffffff;   /* 白色背景 */
+
+  /* 字体大小 */
+  --font-size-extra-large: 20px;  /* 特大字体 */
+  --font-size-large: 18px;        /* 大字体 */
+  --font-size-medium: 16px;       /* 中等字体 */
+  --font-size-base: 14px;         /* 基础字体 */
+  --font-size-small: 13px;        /* 小字体 */
+  --font-size-extra-small: 12px;  /* 特小字体 */
+
+  /* 边距 */
+  --spacing-large: 24px;          /* 大间距 */
+  --spacing-medium: 16px;         /* 中等间距 */
+  --spacing-small: 12px;          /* 小间距 */
+  --spacing-extra-small: 8px;     /* 特小间距 */
+
+  /* 圆角 */
+  --border-radius-base: 4px;      /* 基础圆角 */
+  --border-radius-small: 2px;     /* 小圆角 */
+  --border-radius-round: 20px;    /* 圆形圆角 */
+  --border-radius-circle: 100%;   /* 完全圆形 */
+
+  /* 阴影 */
+  --box-shadow-base: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);  /* 基础阴影 */
+  --box-shadow-light: 0 2px 12px 0 rgba(0, 0, 0, 0.1);                            /* 浅色阴影 */
+}
+
+/* 
+  项目语义化颜色变量
+  使用基础颜色变量定义项目特定的颜色
+*/
+:root {
+  --color-background: var(--vt-c-white);          /* 背景色 */
+  --color-background-soft: var(--vt-c-white-soft); /* 柔和背景色 */
+  --color-background-mute: var(--vt-c-white-mute); /* 静音背景色 */
+
+  --color-border: var(--vt-c-divider-light-2);     /* 边框颜色 */
+  --color-border-hover: var(--vt-c-divider-light-1); /* 悬停边框颜色 */
+
+  --color-heading: var(--vt-c-text-light-1);       /* 标题颜色 */
+  --color-text: var(--vt-c-text-light-1);          /* 文本颜色 */
+
+  --section-gap: 160px;                            /* 区块间距 */
+}
+
+/* 
+  深色模式支持
+  根据系统偏好自动切换深色模式
+*/
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--vt-c-black);
+    --color-background-soft: var(--vt-c-black-soft);
+    --color-background-mute: var(--vt-c-black-mute);
+
+    --color-border: var(--vt-c-divider-dark-2);
+    --color-border-hover: var(--vt-c-divider-dark-1);
+
+    --color-heading: var(--vt-c-text-dark-1);
+    --color-text: var(--vt-c-text-dark-2);
+  }
+}
+
+/* 
+  全局样式重置
+  确保跨浏览器一致性
+*/
+*,
+*::before,
+*::after {
+  box-sizing: border-box;    /* 使用 border-box 盒模型 */
+  margin: 0;                 /* 重置外边距 */
+  padding: 0;               /* 重置内边距 */
+  font-weight: normal;      /* 重置字体粗细 */
+}
+
+/* 
+  全局 body 样式
+  设置基础文本和背景样式
+*/
+body {
+  min-height: 100vh;        /* 最小高度为视口高度 */
+  color: var(--color-text-primary);  /* 使用变量设置文本颜色 */
+  background: var(--background-color-base);  /* 使用变量设置背景色 */
+  transition: color 0.5s, background-color 0.5s;  /* 颜色过渡动画 */
+  line-height: 1.6;         /* 行高 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;  /* 系统字体栈 */
+  font-size: var(--font-size-base);  /* 使用变量设置字体大小 */
+  text-rendering: optimizeLegibility;  /* 优化文本渲染 */
+  -webkit-font-smoothing: antialiased;  /* 字体抗锯齿 */
+  -moz-osx-font-smoothing: grayscale;   /* 字体抗锯齿 */
+}
+
+/* 
+  列表样式重置
+  移除默认的列表样式
+*/
+ul, ol {
+  list-style: none;  /* 移除列表标记 */
+}
+
+/* 
+  表单元素样式重置
+  统一表单元素的样式
+*/
+button,
+input,
+select,
+textarea {
+  font-family: inherit;    /* 继承字体 */
+  font-size: inherit;      /* 继承字体大小 */
+  line-height: inherit;    /* 继承行高 */
+  color: inherit;          /* 继承颜色 */
+  margin: 0;               /* 重置外边距 */
+}
+
+/* 
+  按钮样式重置
+  移除默认按钮样式
+*/
+button {
+  background: none;    /* 移除背景 */
+  border: none;        /* 移除边框 */
+  cursor: pointer;     /* 设置鼠标指针 */
+  padding: 0;          /* 重置内边距 */
+}
+
+/* 
+  链接样式重置
+  移除默认链接样式
+*/
+a {
+  color: inherit;          /* 继承颜色 */
+  text-decoration: none;   /* 移除下划线 */
+}
+
+/* 
+  图片默认样式
+  确保图片响应式显示
+*/
+img {
+  max-width: 100%;     /* 最大宽度为容器宽度 */
+  height: auto;        /* 高度自适应 */
+  vertical-align: middle;  /* 垂直对齐方式 */
+}
+
+/* 
+  使用指南：
+  1. 这个文件定义了全局样式变量和基础样式
+  2. 主要功能：
+     - 定义颜色变量
+     - 定义字体大小
+     - 定义间距和圆角
+     - 定义阴影效果
+     - 支持深色模式
+     - 重置默认样式
+  3. 关键点：
+     - 使用 CSS 变量实现主题定制
+     - 支持响应式设计
+     - 确保跨浏览器一致性
+     - 提供语义化的颜色变量
+  4. 注意事项：
+     - 谨慎修改基础变量
+     - 保持变量命名一致性
+     - 考虑深色模式兼容性
+     - 注意样式优先级
+*/

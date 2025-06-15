@@ -3,14 +3,7 @@
   <div class="folder-detail-container">
     <!-- 页面头部 -->
     <div class="folder-header">
-      <!-- 返回按钮 (现在不再需要返回到 /folders，因为始终在主布局中) -->
-      <!-- <el-button @click="goBackToFolders()" class="back-button">
-        <el-icon><ArrowLeft /></el-icon>
-        返回
-      </el-button> -->
-      <!-- 收藏夹标题 -->
       <h2 class="folder-title">{{ folderStore.selectedFolder?.name }}</h2>
-      <!-- 添加链接按钮 -->
       <el-button type="primary" @click="showDialog()" class="add-button">
         <el-icon><Plus /></el-icon>
         添加链接
@@ -26,7 +19,7 @@
     <div class="links-container">
       <!-- 链接表格 -->
       <el-table
-        :data="folderStore.links"
+        :data="folderStore.currentFolderLinks" <!-- 👈 这里是修改点 -->
         style="width: 100%"
         :empty-text="'暂无链接'"
         class="links-table"
@@ -150,14 +143,11 @@
 </template>
 
 <script setup>
-// 导入必要的 Vue 组件和工具
-import { ref, reactive, onMounted, watch } from 'vue'        // Vue 的组合式 API
-import { useRoute, useRouter } from 'vue-router'     // 路由实例
-import { ElMessage, ElMessageBox } from 'element-plus'  // Element Plus UI 组件
-import { Plus, Link, Document } from '@element-plus/icons-vue'  // Element Plus 图标
-import { useFolderStore } from '@/stores/folder'; // 导入 Pinia Store
+import { ref, reactive, onMounted, watch } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Plus, Link, Document } from '@element-plus/icons-vue';
+import { useFolderStore } from '@/stores/folder';
 
-// 定义 props，接收 folderId
 const props = defineProps({
   folderId: {
     type: String,
@@ -165,30 +155,20 @@ const props = defineProps({
   }
 });
 
-// 初始化路由 (虽然不再直接使用 route.params.id，但保留 useRoute 以防万一)
-const route = useRoute();
-const router = useRouter();
-
-// 获取 Store 实例
 const folderStore = useFolderStore();
 
-// 状态管理
-// const folder = ref(null); // 不再需要，从 store 获取
-// const links = ref([]); // 不再需要，从 store 获取
 const dialogVisible = ref(false);
 const editingLink = ref(null);
-const loading = ref(false); // 用于表单提交的加载状态
-const isSubmitting = ref(false); // 提交状态标志，防止重复提交
+const loading = ref(false);
+const isSubmitting = ref(false);
 const formRef = ref(null);
 
-// 表单数据
 const form = reactive({
   title: '',
   url: '',
   note: ''
 });
 
-// 表单验证规则
 const rules = {
   title: [
     { required: true, message: '请输入链接标题', trigger: 'blur' },
@@ -210,7 +190,6 @@ const rules = {
   ]
 };
 
-// 从文本中提取URL的函数
 const extractUrlFromText = (text) => {
   if (!text) return '';
   const urlRegex = /(https?:\/\/[^\s\"\'\)\]\}]+)/g;
@@ -218,13 +197,6 @@ const extractUrlFromText = (text) => {
   return matches && matches.length > 0 ? matches[0] : text;
 };
 
-// 移除 fetchFolder，因为 folder 信息从 store 获取
-// const fetchFolder = async () => { ... };
-
-// 移除 fetchLinks，因为链接获取逻辑已移到 store
-// const fetchLinks = async () => { ... };
-
-// 显示对话框
 const showDialog = (link = null) => {
   editingLink.value = link;
   if (link) {
@@ -239,7 +211,6 @@ const showDialog = (link = null) => {
   dialogVisible.value = true;
 };
 
-// 处理表单提交
 const handleSubmit = async () => {
   if (!formRef.value || isSubmitting.value) return;
   
@@ -278,16 +249,14 @@ const handleSubmit = async () => {
     if (isEditing) {
       result = await folderStore.updateLink(linkId, formData);
     } else {
-      result = await folderStore.addLink(props.folderId, formData); // 使用 props.folderId
+      result = await folderStore.addLink(formData); // addLink now takes only linkData
     }
 
     if (result.success) {
       dialogVisible.value = false;
-      // 链接列表已在 store 中自动更新，无需手动 fetchLinks()
     }
   } catch (error) {
     console.error('Error submitting link:', error);
-    // 错误信息已在 store 中处理
   } finally {
     setTimeout(() => {
       loading.value = false;
@@ -296,7 +265,6 @@ const handleSubmit = async () => {
   }
 };
 
-// 确认删除链接
 const confirmDelete = (link) => {
   ElMessageBox.confirm(
     '确定要删除这个链接吗？',
@@ -309,42 +277,35 @@ const confirmDelete = (link) => {
   ).then(async () => {
     const result = await folderStore.deleteLink(link._id);
     if (result.success) {
-      // 链接列表已在 store 中自动更新
+      // Links are automatically updated by the store
     }
   }).catch(() => {
-    // 用户取消删除
+    // User cancelled deletion
   });
 };
 
-// 移除 goToFolder 和 goBackToFolders，因为导航逻辑已改变
-// const goToFolder = (folderId) => { ... };
-// const goBackToFolders = () => { ... };
-
-// 监听 props.folderId 变化，当选中文件夹改变时，重新获取链接
 watch(() => props.folderId, (newFolderId) => {
   if (newFolderId) {
     folderStore.fetchLinksByFolder(newFolderId);
   } else {
-    folderStore.links = []; // 如果没有选中文件夹，清空链接
+    // If no folder is selected, ensure currentFolderLinks is empty
+    // This is handled by the getter, but you might want to explicitly clear cache if needed
   }
-}, { immediate: true }); // immediate: true 确保在组件挂载时也执行一次
+}, { immediate: true });
 
-// 组件挂载时，如果 folderId 存在，则获取链接
 onMounted(() => {
-  // fetchFolder() 不再需要
-  // fetchLinks() 也不再需要，因为 watch 已经处理了
+  // fetchLinksByFolder is handled by the watch effect with immediate: true
 });
 </script>
 
 <style scoped>
-/* 收藏夹详情容器样式 */
+/* ... (your existing styles) ... */
 .folder-detail-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 }
 
-/* 页面头部样式 */
 .folder-header {
   display: flex;
   justify-content: space-between;
@@ -358,33 +319,28 @@ onMounted(() => {
   color: #303133;
 }
 
-/* 收藏夹描述样式 */
 .folder-description {
   margin: 0 0 20px;
   color: #606266;
   font-size: 14px;
 }
 
-/* 链接列表容器样式 */
 .links-container {
   background-color: #fff;
   border-radius: 4px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
-/* 链接表格样式 */
 .links-table {
   margin-top: 20px;
 }
 
-/* 链接标题容器样式 */
 .link-title-container {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* 链接标题样式 */
 .link-title {
   color: #409eff;
   text-decoration: none;
@@ -394,7 +350,6 @@ onMounted(() => {
   color: #66b1ff;
 }
 
-/* 链接地址样式 */
 .link-url {
   color: #606266;
   text-decoration: none;
@@ -405,7 +360,6 @@ onMounted(() => {
   color: #409eff;
 }
 
-/* 链接备注样式 */
 .link-note {
   color: #909399;
   display: block;
@@ -416,13 +370,11 @@ onMounted(() => {
   word-break: break-word;
 }
 
-/* 操作按钮组样式 */
 .link-actions {
   display: flex;
   gap: 10px;
 }
 
-/* 链接对话框样式 */
 .link-dialog {
   display: flex;
   justify-content: center;
@@ -449,18 +401,15 @@ onMounted(() => {
   box-sizing: border-box !important;
 }
 
-/* 设置第一个和第二个输入框的高度 */
 .link-form :deep(.el-input__inner),
 .url-input :deep(.el-input__inner) {
-  height: 50px !important; /* 链接和标题输入框高度 */
+  height: 50px !important;
 }
 
-/* 设置摘要输入框高度 */
 .textarea-input :deep(.el-textarea__inner) {
-  min-height: 200px !important; /* 摘要输入框高度 */
+  min-height: 200px !important;
 }
 
-/* URL输入容器 */
 .url-input-container {
   position: relative;
   display: flex;
@@ -492,7 +441,6 @@ onMounted(() => {
   color: #909399;
 }
 
-/* 响应式设计 */
 @media (max-width: 768px) {
   .folder-detail-container {
     padding: 15px;

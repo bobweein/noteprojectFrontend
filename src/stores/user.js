@@ -85,18 +85,7 @@ export const useUserStore = defineStore('user', {
         throw error
       }
     },
-    async fetchFolders() {
-      try {
-        this.token=token
-        const response = await apiClient.get('/api/folders');
-        this.floders = response.data
-        console.log("here",response.data);
-        return { success: true }
-        
-      } catch (error) {
-        console.error('Error fetching folders:', error);
-      }
-    },
+    
     // 登出
     logout() {
       this.user = null

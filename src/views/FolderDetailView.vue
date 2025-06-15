@@ -1,20 +1,15 @@
-<!-- 
-  FolderDetailView.vue - 收藏夹详情页面组件
-  负责展示和管理收藏夹中的链接，包括添加、编辑、删除和查看链接
--->
-
 <template>
   <!-- 收藏夹详情容器 -->
   <div class="folder-detail-container">
     <!-- 页面头部 -->
     <div class="folder-header">
-      <!-- 返回按钮 -->
-      <el-button @click="goBackToFolders()" class="back-button">
+      <!-- 返回按钮 (现在不再需要返回到 /folders，因为始终在主布局中) -->
+      <!-- <el-button @click="goBackToFolders()" class="back-button">
         <el-icon><ArrowLeft /></el-icon>
         返回
-      </el-button>
+      </el-button> -->
       <!-- 收藏夹标题 -->
-      <h2 class="folder-title">{{ folder?.name }}</h2>
+      <h2 class="folder-title">{{ folderStore.selectedFolder?.name }}</h2>
       <!-- 添加链接按钮 -->
       <el-button type="primary" @click="showDialog()" class="add-button">
         <el-icon><Plus /></el-icon>
@@ -24,17 +19,18 @@
 
     <!-- 收藏夹描述 -->
     <p class="folder-description">
-      {{ folder?.description || '暂无描述' }}
+      {{ folderStore.selectedFolder?.description || '暂无描述' }}
     </p>
 
     <!-- 链接列表容器 -->
     <div class="links-container">
       <!-- 链接表格 -->
       <el-table
-        :data="links"
+        :data="folderStore.links"
         style="width: 100%"
         :empty-text="'暂无链接'"
         class="links-table"
+        v-loading="folderStore.loadingLinks"
       >
         <!-- 标题列 -->
         <el-table-column prop="title" label="标题" min-width="200">
@@ -155,159 +151,114 @@
 
 <script setup>
 // 导入必要的 Vue 组件和工具
-import { ref, reactive, onMounted } from 'vue'        // Vue 的组合式 API
+import { ref, reactive, onMounted, watch } from 'vue'        // Vue 的组合式 API
 import { useRoute, useRouter } from 'vue-router'     // 路由实例
-import axios from 'axios'                            // HTTP 请求库
 import { ElMessage, ElMessageBox } from 'element-plus'  // Element Plus UI 组件
-import { ArrowLeft, Plus, Link, Document, Loading } from '@element-plus/icons-vue'  // Element Plus 图标
-import apiClient from '@/utils/api'; 
-// 初始化路由
-const route = useRoute()                             // 获取当前路由信息
-const router = useRouter()                           // 获取路由实例
+import { Plus, Link, Document } from '@element-plus/icons-vue'  // Element Plus 图标
+import { useFolderStore } from '@/stores/folder'; // 导入 Pinia Store
+
+// 定义 props，接收 folderId
+const props = defineProps({
+  folderId: {
+    type: String,
+    required: true
+  }
+});
+
+// 初始化路由 (虽然不再直接使用 route.params.id，但保留 useRoute 以防万一)
+const route = useRoute();
+const router = useRouter();
+
+// 获取 Store 实例
+const folderStore = useFolderStore();
 
 // 状态管理
-const folder = ref(null)                             // 当前收藏夹信息
-const links = ref([])                                // 链接列表
-const dialogVisible = ref(false)                     // 对话框显示状态
-const editingLink = ref(null)                        // 当前编辑的链接
-const loading = ref(false)                           // 加载状态
-const isSubmitting = ref(false)                      // 提交状态标志，防止重复提交
-const formRef = ref(null)                            // 表单引用
+// const folder = ref(null); // 不再需要，从 store 获取
+// const links = ref([]); // 不再需要，从 store 获取
+const dialogVisible = ref(false);
+const editingLink = ref(null);
+const loading = ref(false); // 用于表单提交的加载状态
+const isSubmitting = ref(false); // 提交状态标志，防止重复提交
+const formRef = ref(null);
 
 // 表单数据
 const form = reactive({
-  title: '',                                         // 链接标题
-  url: '',                                           // 链接地址
-  note: ''                                           // 链接备注
-})
+  title: '',
+  url: '',
+  note: ''
+});
 
 // 表单验证规则
 const rules = {
   title: [
-    { required: true, message: '请输入链接标题', trigger: 'blur' },  // 必填验证
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }  // 长度验证
+    { required: true, message: '请输入链接标题', trigger: 'blur' },
+    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
   ],
   url: [
-    // URL不再是必填项, 但如果填写，必须是有效的URL
     { type: 'url', message: '请输入有效的链接地址或留空', trigger: ['blur', 'change'] }
   ],
   note: [
     { validator: (rule, value, callback) => {
-        // 如果URL为空，则备注不能为空
         if (!form.url && !value) {
           callback(new Error('请输入摘要内容，或提供一个链接地址'));
-        }
-        // 如果URL不为空，备注可以为空
-        else if (form.url && !value) {
-          callback();
-        }
-        // 如果URL为空，且备注不为空
-        else if (!form.url && value) {
-           callback();
-        }
-        // 如果都有值
-        else {
+        } else {
           callback();
         }
       },
       trigger: ['blur', 'change']
     }
   ]
-}
+};
 
 // 从文本中提取URL的函数
 const extractUrlFromText = (text) => {
   if (!text) return '';
-  
-  // 匹配URL的正则表达式
   const urlRegex = /(https?:\/\/[^\s\"\'\)\]\}]+)/g;
   const matches = text.match(urlRegex);
-  
-  if (matches && matches.length > 0) {
-    return matches[0]; // 返回第一个匹配到的URL
-  }
-  
-  return text; // 如果没有找到URL，返回原始文本
-}
-
-// 获取收藏夹详情
-const fetchFolder = async () => {
-  try {
-    console.log('Fetching folder details...');       // 调试日志
-   const response = await apiClient.get(`/api/folders/${route.params.id}`);
-    console.log('Folder response:', response.data);  // 调试日志
-    folder.value = response.data;                    // 更新收藏夹信息
-  }catch (error) {
-      console.error('Error:', error);
-      if (error.response?.status === 401) {
-        ElMessage.error('会话已过期，请重新登录');
-        router.push('/login'); // 跳转到登录页面
-      } else {
-        ElMessage.error(error.response?.data?.message || '操作失败');
-      }
-    }
+  return matches && matches.length > 0 ? matches[0] : text;
 };
 
-// 获取链接列表
-const fetchLinks = async () => {
-  try {
-    console.log('Fetching links...');                // 调试日志
-    const response = await apiClient.get(`/api/links/${route.params.id}`);
-    console.log('Links response:', response.data);   // 调试日志
-    links.value = response.data;                     // 更新链接列表
-  } catch (error) {
-      console.error('Error:', error);
-      if (error.response?.status === 401) {
-        ElMessage.error('会话已过期，请重新登录');
-        router.push('/login'); // 跳转到登录页面
-      } else {
-        ElMessage.error(error.response?.data?.message || '操作失败');
-      }
-    }
-};
+// 移除 fetchFolder，因为 folder 信息从 store 获取
+// const fetchFolder = async () => { ... };
+
+// 移除 fetchLinks，因为链接获取逻辑已移到 store
+// const fetchLinks = async () => { ... };
 
 // 显示对话框
 const showDialog = (link = null) => {
-  editingLink.value = link                           // 设置当前编辑的链接
+  editingLink.value = link;
   if (link) {
-    form.title = link.title                          // 填充表单数据
-    form.url = link.url
-    form.note = link.note
+    form.title = link.title;
+    form.url = link.url;
+    form.note = link.note;
   } else {
-    form.title = ''                                  // 清空表单数据
-    form.url = ''
-    form.note = ''
+    form.title = '';
+    form.url = '';
+    form.note = '';
   }
-  dialogVisible.value = true                         // 显示对话框
-}
+  dialogVisible.value = true;
+};
 
 // 处理表单提交
 const handleSubmit = async () => {
-  // 如果表单引用不存在或已经在提交过程中，直接返回
   if (!formRef.value || isSubmitting.value) return;
   
   try {
-    // 验证表单
     const valid = await formRef.value.validate().catch(() => false);
-    if (!valid) return;  // 验证失败，不继续提交
+    if (!valid) return;
     
-    // 设置状态，防止重复提交
     isSubmitting.value = true;
     loading.value = true;
     
-    // 保存当前编辑状态，避免异步操作过程中状态变化
     const isEditing = !!editingLink.value;
     const linkId = isEditing ? editingLink.value._id : null;
     
-    // 创建提交数据的副本并处理URL
     const formData = { 
       title: form.title, 
-      url: extractUrlFromText(form.url), // 自动提取URL
+      url: extractUrlFromText(form.url),
       note: form.note 
     };
     
-    // 如果URL存在但格式不正确，显示提示并终止提交
-    // 使用更完善的URL正则表达式
     const urlPattern = /^(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))?$/;
     if (formData.url && !urlPattern.test(formData.url)) {
       ElMessage.warning('您输入的URL格式不正确，请检查或留空');
@@ -316,7 +267,6 @@ const handleSubmit = async () => {
       return;
     }
 
-    // 如果URL为空，但备注也为空（根据新的校验规则，这不应该发生，但作为双重检查）
     if (!formData.url && !formData.note) {
       ElMessage.warning('请输入链接地址或填写摘要内容');
       isSubmitting.value = false;
@@ -324,30 +274,26 @@ const handleSubmit = async () => {
       return;
     }
     
-    // 替换 axios 调用为 apiClient
+    let result;
     if (isEditing) {
-        await apiClient.put(`/api/links/${linkId}`, formData);
-        ElMessage.success('更新成功');
-        } else {
-        await apiClient.post('/api/links', {
-          ...formData,
-          folderId: route.params.id
-        });
-        ElMessage.success('添加成功');
-      }
-    // 关闭对话框并刷新链接列表
-    dialogVisible.value = false;
-    fetchLinks();
+      result = await folderStore.updateLink(linkId, formData);
+    } else {
+      result = await folderStore.addLink(props.folderId, formData); // 使用 props.folderId
+    }
+
+    if (result.success) {
+      dialogVisible.value = false;
+      // 链接列表已在 store 中自动更新，无需手动 fetchLinks()
+    }
   } catch (error) {
     console.error('Error submitting link:', error);
-    ElMessage.error(error.response?.data?.message || '操作失败');
+    // 错误信息已在 store 中处理
   } finally {
-      // 延迟重置状态，防止按钮闪烁
-      setTimeout(() => {
-        loading.value = false;
-        isSubmitting.value = false;
-      }, 500);
-    }
+    setTimeout(() => {
+      loading.value = false;
+      isSubmitting.value = false;
+    }, 500);
+  }
 };
 
 // 确认删除链接
@@ -361,33 +307,33 @@ const confirmDelete = (link) => {
       type: 'warning'
     }
   ).then(async () => {
-    try {
-      await apiClient.delete(`/api/links/${link._id}`);
-      ElMessage.success('删除成功');                 // 成功提示
-      // 从本地数据中移除已删除的链接
-      links.value = links.value.filter((l) => l._id !== link._id);                              // 刷新链接列表
-    } catch (error) {
-      console.error('Error deleting link:', error);  // 错误日志
-      ElMessage.error(error.response?.data?.message || '删除失败');  // 错误提示
+    const result = await folderStore.deleteLink(link._id);
+    if (result.success) {
+      // 链接列表已在 store 中自动更新
     }
+  }).catch(() => {
+    // 用户取消删除
   });
 };
 
-// 跳转到收藏夹详情页
-const goToFolder = (folderId) => {
-  router.push(`/folders/${folderId}`)                // 路由跳转
-}
+// 移除 goToFolder 和 goBackToFolders，因为导航逻辑已改变
+// const goToFolder = (folderId) => { ... };
+// const goBackToFolders = () => { ... };
 
-// 返回收藏夹列表
-const goBackToFolders = () => {
-  router.push('/folders')
-}
+// 监听 props.folderId 变化，当选中文件夹改变时，重新获取链接
+watch(() => props.folderId, (newFolderId) => {
+  if (newFolderId) {
+    folderStore.fetchLinksByFolder(newFolderId);
+  } else {
+    folderStore.links = []; // 如果没有选中文件夹，清空链接
+  }
+}, { immediate: true }); // immediate: true 确保在组件挂载时也执行一次
 
-// 组件挂载时获取数据
+// 组件挂载时，如果 folderId 存在，则获取链接
 onMounted(() => {
-  fetchFolder()                                      // 获取收藏夹详情
-  fetchLinks()                                       // 获取链接列表
-})
+  // fetchFolder() 不再需要
+  // fetchLinks() 也不再需要，因为 watch 已经处理了
+});
 </script>
 
 <style scoped>
@@ -577,24 +523,3 @@ onMounted(() => {
   }
 }
 </style>
-
-<!-- 
-  使用指南：
-  1. 这个文件实现了收藏夹详情页面
-  2. 主要功能：
-     - 展示收藏夹信息
-     - 展示链接列表
-     - 添加新链接
-     - 编辑链接
-     - 删除链接
-  3. 关键点：
-     - 使用 Element Plus 组件库
-     - 实现表格展示
-     - 处理表单验证
-     - 管理链接状态
-  4. 注意事项：
-     - 确保表单验证规则合理
-     - 处理各种错误情况
-     - 保持界面简洁易用
-     - 考虑不同设备的显示效果
---> 

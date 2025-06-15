@@ -1,121 +1,61 @@
-// 路由配置文件
-// 负责定义应用的路由结构和路由守卫
+import { createRouter, createWebHistory } from 'vue-router';
+import LoginView from '@/views/LoginView.vue';
+import RegisterView from '@/views/RegisterView.vue';
+// import FoldersView from '@/views/FoldersView.vue'; // 不再直接使用
+// import FolderDetailView from '@/views/FolderDetailView.vue'; // 不再直接通过路由访问
 
-import { createRouter, createWebHistory } from 'vue-router'  // Vue Router 相关函数
-import { useUserStore } from '@/stores/user'                 // 用户状态管理
-
-// 创建路由实例
 const router = createRouter({
-  // 使用 HTML5 History 模式
   history: createWebHistory(import.meta.env.BASE_URL),
-  // 定义路由配置
   routes: [
     {
       path: '/',
-      name: 'home',
-      redirect: '/folders'
+      redirect: '/folders' // 默认重定向到 /folders
     },
     {
-      path: '/login',                    // 登录页面路径
-      name: 'login',                     // 路由名称
-      component: () => import('@/views/LoginView.vue'),  // 懒加载登录组件
-      meta: { requiresAuth: false }      // 不需要认证
+      path: '/login',
+      name: 'login',
+      component: LoginView
     },
     {
-      path: '/register',                 // 注册页面路径
-      name: 'register',                  // 路由名称
-      component: () => import('@/views/RegisterView.vue'),  // 懒加载注册组件
-      meta: { requiresAuth: false }      // 不需要认证
+      path: '/register',
+      name: 'register',
+      component: RegisterView
     },
     {
-      path: '/forgot-password',
-      name: 'forgot-password',
-      component: () => import('@/views/ForgotPassword.vue'),
-      meta: { requiresAuth: false }
+      path: '/folders',
+      name: 'folders',
+      // FoldersView 不再直接作为路由组件，而是由 App.vue 内部管理
+      // 这里可以留空或者重定向到 App.vue 的主布局
+      component: () => import('@/App.vue'), // App.vue 负责内部渲染
+      children: [
+        {
+          path: ':id', // 动态路由参数，用于深层链接，但实际渲染由 App.vue 内部处理
+          name: 'folder-detail',
+          // component: FolderDetailView, // 不再直接作为路由组件
+          props: true // 允许将路由参数作为 props 传递，但 App.vue 会直接使用 store
+        }
+      ]
     },
+    // 捕获所有未匹配的路由，重定向到 /folders 或 404 页面
     {
-      path: '/reset-password/:token',
-      name: 'reset-password',
-      component: () => import('@/views/ResetPassword.vue'),
-      meta: { requiresAuth: false }
-    },
-    {
-      path: '/folders',                   // 首页路径
-      name: 'folders',                   // 路由名称
-      component: () => import('@/views/FoldersView.vue'),  // 懒加载收藏夹列表组件
-      meta: { requiresAuth: true }       // 需要认证
-    },
-    {
-      path: '/folders/:id',               // 收藏夹详情页面路径
-      name: 'folder-detail',             // 路由名称
-      component: () => import('@/views/FolderDetailView.vue'),  // 懒加载收藏夹详情组件
-      meta: { requiresAuth: true }       // 需要认证
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      redirect: '/folders' // 或者可以指向一个 404 页面
     }
   ]
-})
+});
 
-// 全局路由守卫
-router.beforeEach(async (to, from, next) => {
-  const userStore = useUserStore()       // 获取用户状态管理实例
-  const token = localStorage.getItem('token')  // 获取本地存储的 token
-  
-  // 如果访问的是登录或注册页面
-  if (!to.meta.requiresAuth) {
-    // 如果用户已登录，重定向到收藏夹页面
-    if (userStore.isAuthenticated) {
-      next({ name: 'folders' })
-    } else {
-      next()
-    }
-    return
+// 路由守卫，确保用户登录
+router.beforeEach((to, from, next) => {
+  const publicPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+  const authRequired = !publicPages.includes(to.path);
+  const loggedIn = localStorage.getItem('token');
+
+  if (authRequired && !loggedIn) {
+    return next('/login');
   }
 
-  // 如果需要认证的页面
-  if (to.meta.requiresAuth) {
-    // 如果用户已登录，直接通过
-    if (userStore.isAuthenticated) {
-      next()
-      return
-    }
+  next();
+});
 
-    // 如果有 token 但没有用户信息，尝试恢复状态
-    if (token && !userStore.user) {
-      try {
-        await userStore.initializeFromToken(token)  // 尝试用 token 初始化用户状态
-        next()
-        return
-      } catch (error) {
-        console.error('Failed to initialize user state:', error)
-        // 只有在明确的认证错误时才清除状态
-        if (error.response?.status === 401) {
-          userStore.logout()
-        }
-      }
-    }
-
-    // 如果没有 token 或初始化失败，重定向到登录页
-    next({ name: 'login' })
-  }
-})
-
-export default router
-
-/* 
-  使用指南：
-  1. 这个文件负责管理应用的所有路由和导航守卫
-  2. 主要功能：
-     - 定义路由结构
-     - 实现路由懒加载
-     - 处理路由权限
-     - 管理页面跳转
-  3. 关键点：
-     - 使用懒加载优化性能
-     - 实现路由守卫保护需要认证的页面
-     - 处理 token 验证和状态恢复
-     - 管理登录状态和页面重定向
-  4. 注意事项：
-     - 确保路由路径正确
-     - 合理使用懒加载
-     - 正确处理认证状态
-     - 注意路由守卫的执行顺序
-*/
+export default router;

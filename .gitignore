@@ -26,5 +26,5 @@ myenv
 *.njsproj
 *.sln
 *.sw?
-
+*.txt
 *.tsbuildinfo

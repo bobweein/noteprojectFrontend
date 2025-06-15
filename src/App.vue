@@ -1,21 +1,20 @@
-<!-- 
-  App.vue - 应用程序的主入口组件
-  这个文件包含了整个应用的基本布局和全局状态管理
--->
-
 <script setup>
+// filepath: src/App.vue
 // 导入必要的 Vue 组件和工具
 import { RouterLink, RouterView } from 'vue-router'  // 路由相关组件
-import { computed, onMounted, ref } from 'vue'       // Vue 的组合式 API
+import { computed, onMounted, ref, watch } from 'vue'       // Vue 的组合式 API
 import { useRouter } from 'vue-router'               // 路由实例
 import { useUserStore } from '@/stores/user'         // 用户状态管理
+import { useFolderStore } from '@/stores/folder';    // 导入新的 Folder Store
 import { ElMessage, ElLoading } from 'element-plus'  // Element Plus UI 组件
 import { Loading } from '@element-plus/icons-vue'    // Element Plus 图标
 import Sidebar from '@/components/Sidebar.vue'
+import FolderDetailView from '@/views/FolderDetailView.vue'; // 导入 FolderDetailView
 
 // 初始化路由和用户状态
 const router = useRouter()                           // 获取路由实例
 const userStore = useUserStore()                     // 获取用户状态管理实例
+const folderStore = useFolderStore();                // 获取 Folder Store 实例
 const isLoading = ref(true)                          // 加载状态标志
 
 // 计算属性：获取当前用户和认证状态
@@ -25,6 +24,7 @@ const isAuthenticated = computed(() => userStore.isAuthenticated)  // 是否已�
 // 处理用户登出
 const handleLogout = () => {
   userStore.logout()                                 // 清除用户状态
+  folderStore.$reset();                              // 清除 Folder Store 状态
   ElMessage.success('已退出登录')                    // 显示成功消息
   router.push('/login')                             // 跳转到登录页
 }
@@ -40,6 +40,7 @@ const initializeUserState = async () => {
       // 只有在明确的认证错误时才登出
       if (error.response?.status === 401) {
         userStore.logout()
+        folderStore.$reset(); // 清除 Folder Store 状态
         // 如果当前不在登录页面，重定向到登录页
         if (router.currentRoute.value.name !== 'login') {
           router.push('/login')
@@ -50,10 +51,28 @@ const initializeUserState = async () => {
   isLoading.value = false                           // 关闭加载状态
 }
 
+// 监听 selectedFolderId 变化，如果需要路由跳转（可选，但为了保持URL一致性）
+watch(() => folderStore.selectedFolderId, (newId) => {
+  if (newId && router.currentRoute.value.params.id !== newId) {
+    router.replace(`/folders/${newId}`);
+  } else if (!newId && router.currentRoute.value.path !== '/folders') {
+    router.replace('/folders'); // 如果没有选中文件夹，回到 /folders 基础路径
+  }
+}, { immediate: true }); // immediate: true 确保在组件挂载时也执行一次
+
 // 组件挂载时初始化用户状态
 onMounted(() => {
-  initializeUserState()
-})
+  initializeUserState();
+  // 尝试从路由参数中恢复选中状态（如果用户直接访问 /folders/:id）
+  if (router.currentRoute.value.params.id) {
+    folderStore.selectFolder(router.currentRoute.value.params.id);
+  } else {
+    // 如果没有指定ID，默认选中第一个文件夹（如果存在）
+    if (folderStore.folders.length > 0) {
+      folderStore.selectFolder(folderStore.folders[0]._id);
+    }
+  }
+});
 </script>
 
 <template>
@@ -81,7 +100,14 @@ onMounted(() => {
       </el-aside>
       
       <el-main class="app-main">
-        <router-view />
+        <!-- 根据 selectedFolderId 渲染 FolderDetailView 或提示信息 -->
+        <FolderDetailView 
+          v-if="folderStore.selectedFolderId" 
+          :folderId="folderStore.selectedFolderId" 
+        />
+        <div v-else class="no-folder-selected">
+          <p>请在左侧选择一个收藏夹，或点击“新建收藏夹”创建一个。</p>
+        </div>
       </el-main>
     </el-container>
   </el-container>
@@ -92,133 +118,95 @@ onMounted(() => {
   </div>
 </template>
 
-<style>
-/* 全局样式重置 */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
-  height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-#app {
-  height: 100%;
-}
-</style>
-
 <style scoped>
-.app-container {
-  min-height: 100vh;
+/* ...existing styles... */
+
+.app-loading {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 20px;
+  color: #409eff;
+}
+
+.app-loading .el-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+
+.app-container {
+  height: 100vh;
 }
 
 .app-header {
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #409eff;
+  color: #fff;
+  display: flex;
+  align-items: center;
   padding: 0 20px;
-  height: 60px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
+  height: 60px; /* 固定头部高度 */
 }
 
 .header-content {
-  height: 100%;
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
-.header-content h1 {
+.app-header h1 {
   margin: 0;
-  font-size: 24px;
-  color: #303133;
+  font-size: 22px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
+}
+
+.user-info span {
+  font-size: 16px;
+}
+
+.user-info .el-button {
+  color: #fff;
 }
 
 .main-container {
-  margin-top: 60px;
-  flex: 1;
-  min-height: calc(100vh - 60px);
+  height: calc(100vh - 60px); /* 减去头部高度 */
+}
+
+.el-aside {
+  background-color: #fff;
+  border-right: 1px solid var(--el-border-color-light);
+  box-sizing: border-box;
+  overflow-y: auto; /* 允许侧边栏内容滚动 */
 }
 
 .app-main {
-  background-color: #f5f7fa;
   padding: 20px;
-  height: 100%;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .app-header {
-    padding: 0 10px;
-  }
-  
-  .header-content h1 {
-    font-size: 20px;
-  }
-  
-  .app-main {
-    padding: 10px;
-  }
+  background-color: #f0f2f5;
+  overflow-y: auto; /* 允许主内容区域滚动 */
 }
 
 .auth-container {
-  min-height: 100vh;
-  width: 100%;
-}
-
-.app-loading {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  height: 100vh;
   display: flex;
-  flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.9);
-  z-index: 9999;
+  background-color: #f0f2f5;
 }
 
-.app-loading .el-icon {
-  font-size: 40px;
-  color: #409eff;
-  margin-bottom: 10px;
+.no-folder-selected {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #909399;
+  font-size: 16px;
+  text-align: center;
 }
 </style>
-
-<!-- 
-  使用指南：
-  1. 这个文件是应用的根组件，负责整体布局和用户认证状态管理
-  2. 主要功能：
-     - 显示顶部导航栏（登录后）
-     - 管理用户认证状态
-     - 处理页面刷新时的状态恢复
-     - 提供响应式布局
-  3. 关键点：
-     - 使用 localStorage 存储 token
-     - 使用 Pinia 管理用户状态
-     - 使用 Element Plus 组件库
-     - 实现了响应式设计
-  4. 注意事项：
-     - 确保后端 API 正确配置
-     - 注意 token 的安全性
-     - 保持样式的一致性
-     - 考虑不同设备的显示效果
--->

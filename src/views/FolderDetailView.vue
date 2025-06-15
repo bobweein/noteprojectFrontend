@@ -1,5 +1,5 @@
 <template>
-  <!-- 收藏夹详情容器 -->
+  <!-- 收藏夹详情容器 1-->
   <div class="folder-detail-container">
     <!-- 页面头部 -->
     <div class="folder-header">

@@ -11,7 +11,7 @@
       <!-- 新的侧边栏头部，包含标题和操作按钮 -->
       <div class="sidebar-header">
         <el-icon><Folder /></el-icon>
-        <span class="header-title">我的收藏夹</span>
+        <span class="header-title">收藏夹</span>
         <div class="header-actions">
           <el-button link @click="showCreateFolderDialog" title="新建收藏夹">
             <el-icon><Plus /></el-icon>
@@ -245,7 +245,8 @@ onMounted(() => {
 
 <style scoped>
 .sidebar {
-  width: 200px;
+  width: 20%;
+  max-width: 300px;
   height: 100%;
   border-right: 1px solid #e6e6e6;
   background-color: #fff;

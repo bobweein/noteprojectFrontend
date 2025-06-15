@@ -1,31 +1,148 @@
 <template>
-  <!-- ... existing template code ... -->
+  <!-- 收藏夹详情容器 -->
   <div class="folder-detail-container">
-    <!-- ... existing header and description ... -->
-
-    <!-- 链接列表容器 -->
-    <div class="links-container">
-      <!-- 链接表格 -->
-      <el-table
-        :data="folderStore.currentFolderLinks"
-        style="width: 100%"
-        :empty-text="'暂无链接'"
-        class="links-table"
-        v-loading="folderStore.loadingLinks"
-        ref="linkTableRef"
-      >
-        <!-- ... existing table columns ... -->
-      </el-table>
+    <!-- 页面头部 -->
+    <div class="folder-header">
+      <h2 class="folder-title">{{ folderStore.selectedFolder?.name }}</h2>
+      <el-button type="primary" @click="showDialog()" class="add-button">
+        <el-icon><Plus /></el-icon>
+        添加链接
+      </el-button>
     </div>
 
-    <!-- ... existing dialog ... -->
+    <!-- 收藏夹描述 -->
+    <p class="folder-description">
+      {{ folderStore.selectedFolder?.description || '暂无描述' }}
+    </p>
+
+    <!-- 链接列表容器 - 替换 el-table -->
+    <div class="links-list-container">
+      <div v-if="folderStore.loadingLinks" class="loading-indicator">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>加载链接中...</span>
+      </div>
+      <div v-else-if="folderStore.currentFolderLinks.length === 0" class="empty-links">
+        <p>暂无链接</p>
+      </div>
+      <div v-else class="links-list">
+        <div 
+          v-for="link in folderStore.currentFolderLinks" 
+          :key="link._id" 
+          class="link-item"
+        >
+          <div class="link-item-header">
+            <div class="link-info">
+              <div class="link-title-wrapper">
+                <el-icon><Document /></el-icon>
+                <span class="link-title-text">{{ link.title }}</span>
+              </div>
+              <a v-if="link.url" :href="link.url" target="_blank" class="link-url-text">
+                <el-icon><Link /></el-icon>
+                {{ link.url }}
+              </a>
+              <span v-else class="link-url-text no-url">无链接地址</span>
+            </div>
+            <div class="link-item-actions">
+              <el-button 
+                type="text" 
+                size="small" 
+                @click.stop="showDialog(link)"
+                class="edit-button"
+              >
+                编辑
+              </el-button>
+              <el-button 
+                type="text" 
+                size="small" 
+                @click.stop="confirmDelete(link)"
+                class="delete-button"
+              >
+                删除
+              </el-button>
+              <el-button 
+                link 
+                @click="toggleLinkExpansion(link._id)" 
+                class="expand-button"
+                :title="expandedStates[link._id] ? '收起摘要' : '展开摘要'"
+              >
+                <el-icon>
+                  <component :is="expandedStates[link._id] ? ArrowUp : ArrowDown" />
+                </el-icon>
+              </el-button>
+            </div>
+          </div>
+          <div v-show="expandedStates[link._id]" class="link-item-note">
+            <p>{{ link.note || '暂无摘要内容' }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 添加/编辑链接对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editingLink ? '编辑链接' : '添加链接'"
+      width="50%"
+      :max-width="600"
+      class="link-dialog"
+      destroy-on-close
+    >
+      <!-- 表单 -->
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-position="top"
+        class="link-form"
+      >
+        <!-- 链接输入框 -->
+        <el-form-item label="链接" prop="url">
+          <div class="url-input-container">
+            <el-input 
+              v-model="form.url" 
+              placeholder="请输入链接地址 (可选)"
+              :prefix-icon="Link"
+              class="url-input"
+            />
+          </div>
+        </el-form-item>
+        <!-- 标题输入框 -->
+        <el-form-item label="标题" prop="title">
+          <el-input 
+            v-model="form.title" 
+            placeholder="请输入链接标题"
+            :prefix-icon="Document"
+            class="form-input"
+          />
+        </el-form-item>
+        <!-- 摘要输入框 -->
+        <el-form-item label="摘要" prop="note">
+          <el-input
+            v-model="form.note"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入摘要"
+            class="form-input textarea-input"
+          />
+        </el-form-item>
+      </el-form>
+      <!-- 对话框底部按钮 -->
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="loading">
+            确定
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, nextTick } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue'; // 移除 nextTick
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Link, Document } from '@element-plus/icons-vue';
+import { Plus, Link, Document, ArrowDown, ArrowUp, Loading } from '@element-plus/icons-vue'; // 导入新图标
 import { useFolderStore } from '@/stores/folder';
 
 const props = defineProps({
@@ -42,7 +159,10 @@ const editingLink = ref(null);
 const loading = ref(false);
 const isSubmitting = ref(false);
 const formRef = ref(null);
-const linkTableRef = ref(null); // 声明 el-table 的 ref
+// const linkTableRef = ref(null); // 移除 el-table 的 ref
+
+// 用于管理每个链接的展开状态
+const expandedStates = reactive({});
 
 const form = reactive({
   title: '',
@@ -54,8 +174,21 @@ const rules = {
   title: [
     { required: true, message: '请输入链接标题', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  url: [
+    { type: 'url', message: '请输入有效的链接地址或留空', trigger: ['blur', 'change'] }
+  ],
+  note: [
+    { validator: (rule, value, callback) => {
+        if (!form.url && !value) {
+          callback(new Error('请输入摘要内容，或提供一个链接地址'));
+        } else {
+          callback();
+        }
+      },
+      trigger: ['blur', 'change']
+    }
   ]
-  // ... existing rules ...
 };
 
 const extractUrlFromText = (text) => {
@@ -83,9 +216,12 @@ const handleSubmit = async () => {
   if (!formRef.value || isSubmitting.value) return;
   
   try {
-    await formRef.value.validate();
+    const valid = await formRef.value.validate().catch(() => false);
+    if (!valid) return;
+    
+    isSubmitting.value = true;
     loading.value = true;
-
+    
     const isEditing = !!editingLink.value;
     const linkId = isEditing ? editingLink.value._id : null;
     
@@ -98,15 +234,15 @@ const handleSubmit = async () => {
     const urlPattern = /^(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))?$/;
     if (formData.url && !urlPattern.test(formData.url)) {
       ElMessage.warning('您输入的URL格式不正确，请检查或留空');
-      loading.value = false;
       isSubmitting.value = false;
+      loading.value = false;
       return;
     }
 
     if (!formData.url && !formData.note) {
       ElMessage.warning('请输入链接地址或填写摘要内容');
-      loading.value = false;
       isSubmitting.value = false;
+      loading.value = false;
       return;
     }
     
@@ -145,56 +281,52 @@ const confirmDelete = (link) => {
       ElMessage.error(result.message);
     }
   }).catch(() => {
-    // User cancelled deletion
+    // 用户取消删除
   });
+};
+
+// 切换链接摘要的展开/收起状态
+const toggleLinkExpansion = (linkId) => {
+  expandedStates[linkId] = !expandedStates[linkId];
 };
 
 // 监听 props.folderId 变化，当选中文件夹改变时，重新获取链接
 watch(() => props.folderId, async (newFolderId) => {
   if (newFolderId) {
     await folderStore.fetchLinksByFolder(newFolderId);
-    // 在数据更新并 DOM 渲染完成后，强制 el-table 重新布局
-    nextTick(() => {
-      if (linkTableRef.value) {
-        // 增加一个小的延迟，确保 DOM 完全准备好并可见
-        setTimeout(() => {
-          linkTableRef.value.doLayout();
-        }, 50); // 50ms 延迟
-      }
-    });
+    // 重置所有链接的展开状态
+    for (const key in expandedStates) {
+      delete expandedStates[key];
+    }
   }
 }, { immediate: true });
 
-
-// 监听 loadingLinks 状态，在加载完成后强制 el-table 重新布局
-watch(() => folderStore.loadingLinks, (newVal, oldVal) => {
-  if (oldVal === true && newVal === false) { // 从加载中变为加载完成
-    nextTick(() => {
-      if (linkTableRef.value) {
-        // 增加一个小的延迟，确保 DOM 完全准备好并可见
-        setTimeout(() => {
-          linkTableRef.value.doLayout();
-        }, 50); // 50ms 延迟
-      }
-    });
-  }
-});
+// 移除对 loadingLinks 的监听和 doLayout 调用，因为不再使用 el-table
+// watch(() => folderStore.loadingLinks, (newVal, oldVal) => {
+//   if (oldVal === true && newVal === false) {
+//     nextTick(() => {
+//       if (linkTableRef.value) {
+//         setTimeout(() => {
+//           linkTableRef.value.doLayout();
+//         }, 50);
+//       }
+//     });
+//   }
+// });
 
 onMounted(() => {
-  // 在组件挂载时，如果表格已经存在，也强制进行一次布局
-  nextTick(() => {
-    if (linkTableRef.value) {
-      // 增加一个小的延迟，确保 DOM 完全准备好并可见
-      setTimeout(() => {
-        linkTableRef.value.doLayout();
-      }, 50); // 50ms 延迟
-    }
-  });
+  // 移除对 el-table 的 doLayout 调用
+  // nextTick(() => {
+  //   if (linkTableRef.value) {
+  //     setTimeout(() => {
+  //       linkTableRef.value.doLayout();
+  //     }, 50);
+  //   }
+  // });
 });
 </script>
 
 <style scoped>
-/* ... (your existing styles) ... */
 .folder-detail-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -220,56 +352,137 @@ onMounted(() => {
   font-size: 14px;
 }
 
-.links-container {
+/* 新增：链接列表容器样式 */
+.links-list-container {
   background-color: #fff;
   border-radius: 4px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 10px;
+  max-height: calc(100vh - 250px); /* 固定高度，根据实际布局调整 */
+  overflow-y: auto; /* 允许垂直滚动 */
 }
 
-.links-table {
-  margin-top: 20px;
-}
-
-.link-title-container {
+.loading-indicator,
+.empty-links {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 8px;
-}
-
-.link-title {
-  color: #409eff;
-  text-decoration: none;
-}
-
-.link-title:hover {
-  color: #66b1ff;
-}
-
-.link-url {
-  color: #606266;
-  text-decoration: none;
-  word-break: break-all;
-}
-
-.link-url:hover {
-  color: #409eff;
-}
-
-.link-note {
+  min-height: 150px; /* 确保加载/空状态有足够高度 */
   color: #909399;
-  display: block;
-  max-height: 60px;
-  overflow-y: auto;
-  text-overflow: ellipsis;
-  line-height: 1.5;
-  word-break: break-word;
+  font-size: 16px;
 }
 
-.link-actions {
+.loading-indicator .el-icon {
+  font-size: 30px;
+  margin-bottom: 10px;
+}
+
+.links-list {
   display: flex;
+  flex-direction: column;
+  gap: 10px; /* 链接项之间的间距 */
+}
+
+.link-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 10px 15px;
+  background-color: #fdfdfd;
+  transition: all 0.2s ease-in-out;
+}
+
+.link-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.link-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap; /* 允许换行 */
   gap: 10px;
 }
 
+.link-info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0; /* 允许内容收缩 */
+}
+
+.link-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+  color: #303133;
+  font-size: 16px;
+  word-break: break-word; /* 允许长标题换行 */
+}
+
+.link-title-text {
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* 标题默认不换行 */
+}
+
+.link-url-text {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #409eff;
+  text-decoration: none;
+  font-size: 13px;
+  word-break: break-all; /* 链接地址允许换行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* 链接默认不换行 */
+}
+
+.link-url-text.no-url {
+  color: #909399;
+  font-style: italic;
+}
+
+.link-url-text:hover {
+  text-decoration: underline;
+}
+
+.link-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0; /* 防止按钮被压缩 */
+}
+
+.link-item-actions .el-button {
+  padding: 0 5px;
+  min-height: unset;
+  height: auto;
+  font-size: 14px;
+}
+
+.expand-button .el-icon {
+  font-size: 18px;
+  transition: transform 0.2s;
+}
+
+.link-item-note {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #ebeef5;
+  color: #606266;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap; /* 保留换行符和空格 */
+  word-break: break-word; /* 允许长单词换行 */
+}
+
+/* 对话框和表单样式保持不变 */
 .link-dialog {
   display: flex;
   justify-content: center;
@@ -354,15 +567,25 @@ onMounted(() => {
   .add-button {
     width: 100%;
   }
+
+  .links-list-container {
+    max-height: calc(100vh - 200px); /* 调整小屏幕下的高度 */
+  }
+
+  .link-item-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .link-item-actions {
+    width: 100%;
+    justify-content: flex-end; /* 按钮靠右对齐 */
+  }
 }
 
 @media (max-width: 480px) {
   .folder-detail-container {
     padding: 10px;
-  }
-  
-  .links-table {
-    margin-top: 15px;
   }
 }
 </style>

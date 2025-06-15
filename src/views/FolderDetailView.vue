@@ -19,7 +19,7 @@
     <div class="links-container">
       <!-- 链接表格 -->
       <el-table
-        :data="folderStore.currentFolderLinks" <!-- 👈 这里是修改点 -->
+        :data="folderStore.currentFolderLinks" <!-- 这里是修改点 -->
         style="width: 100%"
         :empty-text="'暂无链接'"
         class="links-table"

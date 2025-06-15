@@ -1,5 +1,5 @@
 <template>
-  <!-- 收藏夹详情容器 1-->
+  <!-- 收藏夹详情容器 -->
   <div class="folder-detail-container">
     <!-- 页面头部 -->
     <div class="folder-header">
@@ -24,6 +24,7 @@
         :empty-text="'暂无链接'"
         class="links-table"
         v-loading="folderStore.loadingLinks"
+        ref="linkTableRef" <!-- 添加 ref 属性 -->
       >
         <!-- 标题列 -->
         <el-table-column prop="title" label="标题" min-width="200">
@@ -143,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, reactive, onMounted, watch, nextTick } from 'vue'; // 导入 nextTick
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Link, Document } from '@element-plus/icons-vue';
 import { useFolderStore } from '@/stores/folder';
@@ -162,6 +163,7 @@ const editingLink = ref(null);
 const loading = ref(false);
 const isSubmitting = ref(false);
 const formRef = ref(null);
+const linkTableRef = ref(null); // 声明 el-table 的 ref
 
 const form = reactive({
   title: '',
@@ -284,9 +286,15 @@ const confirmDelete = (link) => {
   });
 };
 
-watch(() => props.folderId, (newFolderId) => {
+watch(() => props.folderId, async (newFolderId) => { // 将 watcher 设为 async
   if (newFolderId) {
-    folderStore.fetchLinksByFolder(newFolderId);
+    await folderStore.fetchLinksByFolder(newFolderId); // 等待数据获取完成
+    // 在数据更新并 DOM 渲染完成后，强制 el-table 重新布局
+    nextTick(() => {
+      if (linkTableRef.value) {
+        linkTableRef.value.doLayout();
+      }
+    });
   } else {
     // If no folder is selected, ensure currentFolderLinks is empty
     // This is handled by the getter, but you might want to explicitly clear cache if needed
@@ -294,7 +302,12 @@ watch(() => props.folderId, (newFolderId) => {
 }, { immediate: true });
 
 onMounted(() => {
-  // fetchLinksByFolder is handled by the watch effect with immediate: true
+  // 在组件挂载时，如果表格已经存在，也强制进行一次布局
+  nextTick(() => {
+    if (linkTableRef.value) {
+      linkTableRef.value.doLayout();
+    }
+  });
 });
 </script>
 

@@ -187,13 +187,13 @@ onMounted(() => {
 }
 
 .app-main {
-  padding: 20px;
+  padding: 0px;
   background-color: #f0f2f5;
   overflow-y: auto; /* 允许主内容区域滚动 */
 }
 
 .auth-container {
-  height: 100vh;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;

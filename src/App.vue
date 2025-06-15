@@ -95,7 +95,7 @@ onMounted(() => {
     </el-header>
     
     <el-container class="main-container">
-      <el-aside width="200px">
+      <el-aside width="30%">
         <Sidebar />
       </el-aside>
       

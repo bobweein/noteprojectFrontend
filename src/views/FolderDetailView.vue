@@ -153,21 +153,28 @@ const confirmDelete = (link) => {
 watch(() => props.folderId, async (newFolderId) => {
   if (newFolderId) {
     await folderStore.fetchLinksByFolder(newFolderId);
-    // 这里的 doLayout 仍然保留，以防万一
+    // 在数据更新并 DOM 渲染完成后，强制 el-table 重新布局
     nextTick(() => {
       if (linkTableRef.value) {
-        linkTableRef.value.doLayout();
+        // 增加一个小的延迟，确保 DOM 完全准备好并可见
+        setTimeout(() => {
+          linkTableRef.value.doLayout();
+        }, 50); // 50ms 延迟
       }
     });
   }
 }, { immediate: true });
 
-// 新增：监听 loadingLinks 状态，在加载完成后强制 el-table 重新布局
+
+// 监听 loadingLinks 状态，在加载完成后强制 el-table 重新布局
 watch(() => folderStore.loadingLinks, (newVal, oldVal) => {
   if (oldVal === true && newVal === false) { // 从加载中变为加载完成
     nextTick(() => {
       if (linkTableRef.value) {
-        linkTableRef.value.doLayout();
+        // 增加一个小的延迟，确保 DOM 完全准备好并可见
+        setTimeout(() => {
+          linkTableRef.value.doLayout();
+        }, 50); // 50ms 延迟
       }
     });
   }
@@ -177,7 +184,10 @@ onMounted(() => {
   // 在组件挂载时，如果表格已经存在，也强制进行一次布局
   nextTick(() => {
     if (linkTableRef.value) {
-      linkTableRef.value.doLayout();
+      // 增加一个小的延迟，确保 DOM 完全准备好并可见
+      setTimeout(() => {
+        linkTableRef.value.doLayout();
+      }, 50); // 50ms 延迟
     }
   });
 });

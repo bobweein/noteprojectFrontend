@@ -8,56 +8,50 @@
       :unique-opened="true"
       :loading="folderStore.loadingFolders"
     >
-      <!-- "我的收藏夹" 菜单项，用于显示所有文件夹 -->
-      <el-sub-menu index="folders-management">
-        <template #title>
-          <el-icon><Folder /></el-icon>
-          <span>我的收藏夹</span>
-        </template>
-        
-        <!-- 新建收藏夹按钮 -->
-        <el-menu-item index="new-folder" @click="showCreateFolderDialog">
-          <el-icon><Plus /></el-icon>
-          <span>新建收藏夹</span>
-        </el-menu-item>
+      <!-- 新的侧边栏头部，包含标题和操作按钮 -->
+      <div class="sidebar-header">
+        <el-icon><Folder /></el-icon>
+        <span class="header-title">我的收藏夹</span>
+        <div class="header-actions">
+          <el-button link @click="showCreateFolderDialog" title="新建收藏夹">
+            <el-icon><Plus /></el-icon>
+          </el-button>
+          <el-button link @click="folderStore.fetchAllFolders()" title="刷新列表">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </div>
+      </div>
 
-        <!-- 刷新收藏夹列表 -->
-        <el-menu-item index="refresh-folders" @click="folderStore.fetchAllFolders()">
-          <el-icon><Refresh /></el-icon>
-          <span>刷新列表</span>
-        </el-menu-item>
+      <el-divider class="menu-divider" />
 
-        <el-divider class="menu-divider" />
-
-        <!-- 循环渲染收藏夹列表 -->
-        <el-menu-item 
-          v-for="folder in folderStore.folders" 
-          :key="folder._id" 
-          :index="folder._id"
-          class="folder-menu-item"
-        >
-          <el-icon><FolderOpened /></el-icon>
-          <span class="folder-name-text">{{ folder.name }}</span>
-          <div class="folder-item-actions">
-            <el-button 
-              type="text" 
-              size="small" 
-              @click.stop="showEditFolderDialog(folder)"
-              class="edit-button"
-            >
-              <el-icon><Edit /></el-icon>
-            </el-button>
-            <el-button 
-              type="text" 
-              size="small" 
-              @click.stop="confirmDeleteFolder(folder)"
-              class="delete-button"
-            >
-              <el-icon><Delete /></el-icon>
-            </el-button>
-          </div>
-        </el-menu-item>
-      </el-sub-menu>
+      <!-- 循环渲染收藏夹列表 -->
+      <el-menu-item 
+        v-for="folder in folderStore.folders" 
+        :key="folder._id" 
+        :index="folder._id"
+        class="folder-menu-item"
+      >
+        <el-icon><FolderOpened /></el-icon>
+        <span class="folder-name-text">{{ folder.name }}</span>
+        <div class="folder-item-actions">
+          <el-button 
+            type="text" 
+            size="small" 
+            @click.stop="showEditFolderDialog(folder)"
+            class="edit-button"
+          >
+            <el-icon><Edit /></el-icon>
+          </el-button>
+          <el-button 
+            type="text" 
+            size="small" 
+            @click.stop="confirmDeleteFolder(folder)"
+            class="delete-button"
+          >
+            <el-icon><Delete /></el-icon>
+          </el-button>
+        </div>
+      </el-menu-item>
     </el-menu>
 
     <!-- 新建/编辑收藏夹对话框 (从 FoldersView.vue 迁移过来) -->
@@ -129,8 +123,9 @@ const rules = {
 
 // 处理菜单项选择 (收藏夹点击)
 const handleFolderSelect = (index) => {
-  // 排除功能性菜单项
-  if (['new-folder', 'refresh-folders', 'folders-management'].includes(index)) {
+  // 排除功能性菜单项 (现在这些功能项不再是 el-menu-item 的 index)
+  // 实际上，由于它们现在是按钮，这个检查可能不再严格需要，但保留以防万一
+  if (['folders-management'].includes(index)) { 
     return;
   }
   folderStore.setSelectedFolder(index);
@@ -171,7 +166,7 @@ const handleSubmit = async () => {
     const isDuplicateName = folderStore.folders.find(existingFolder => {
       const hasSameName = existingFolder.name === newFolderName;
       const isNotCurrentFolder = !currentFolderId || existingFolder._id !== currentFolderId;
-      return hasSameName && isNotCurrentFolder;
+      return hasSameName && isNotCurrentName; // 修复：这里应该是 isNotCurrentFolder
     });
 
     if (isDuplicateName) {
@@ -238,8 +233,10 @@ watch(() => folderStore.folders.length, (newLength) => {
   }
 }, { immediate: true });
 
-// 确保在组件挂载时，如果路由中有ID，则尝试选中该文件夹
+// 确保在组件挂载时，立即获取所有收藏夹
 onMounted(() => {
+  folderStore.fetchAllFolders(); // 立即加载所有收藏夹
+  // 如果路由中有ID，则尝试选中该文件夹 (这个逻辑在上面的 watch 已经处理了，但为了健壮性可以保留)
   if (route.params.id) {
     folderStore.setSelectedFolder(route.params.id);
   }
@@ -260,10 +257,45 @@ onMounted(() => {
   border-right: none;
 }
 
+/* 新增侧边栏头部样式 */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px; /* 与 el-menu-item 的 padding 保持一致 */
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+  gap: 8px; /* 图标和文字之间的间距 */
+  height: var(--el-menu-item-height); /* 保持与菜单项相同的高度 */
+  box-sizing: border-box; /* 确保 padding 不会增加总高度 */
+}
+
+.sidebar-header .header-title {
+  flex-grow: 1; /* 让标题占据剩余空间 */
+}
+
+.sidebar-header .header-actions {
+  display: flex;
+  gap: 5px; /* 按钮之间的间距 */
+}
+
+.sidebar-header .header-actions .el-button {
+  padding: 0;
+  min-height: unset;
+  height: auto;
+  font-size: 18px; /* 调整图标大小 */
+  color: #606266; /* 调整图标颜色 */
+}
+
+.sidebar-header .header-actions .el-button:hover {
+  color: #409eff; /* 悬停颜色 */
+}
+
 .el-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding-left: 20px !important; /* 调整以匹配 header 的左边距 */
 }
 
 .el-icon {

@@ -1,150 +1,29 @@
 <template>
-  <!-- 收藏夹详情容器 -->
+  <!-- ... existing template code ... -->
   <div class="folder-detail-container">
-    <!-- 页面头部 -->
-    <div class="folder-header">
-      <h2 class="folder-title">{{ folderStore.selectedFolder?.name }}</h2>
-      <el-button type="primary" @click="showDialog()" class="add-button">
-        <el-icon><Plus /></el-icon>
-        添加链接
-      </el-button>
-    </div>
-
-    <!-- 收藏夹描述 -->
-    <p class="folder-description">
-      {{ folderStore.selectedFolder?.description || '暂无描述' }}
-    </p>
+    <!-- ... existing header and description ... -->
 
     <!-- 链接列表容器 -->
     <div class="links-container">
       <!-- 链接表格 -->
       <el-table
-        :data="folderStore.currentFolderLinks" <!-- 这里是修改点 -->
+        :data="folderStore.currentFolderLinks"
         style="width: 100%"
         :empty-text="'暂无链接'"
         class="links-table"
         v-loading="folderStore.loadingLinks"
-        ref="linkTableRef" <!-- 添加 ref 属性 -->
+        ref="linkTableRef"
       >
-        <!-- 标题列 -->
-        <el-table-column prop="title" label="标题" min-width="200">
-          <template #default="{ row }">
-            <div class="link-title-container">
-              <el-icon><Link /></el-icon>
-              <a :href="row.url" target="_blank" class="link-title">
-                {{ row.title }}
-              </a>
-            </div>
-          </template>
-        </el-table-column>
-        
-        <!-- 链接列 -->
-        <el-table-column prop="url" label="链接" min-width="250">
-          <template #default="{ row }">
-            <a :href="row.url" target="_blank" class="link-url">
-              {{ row.url }}
-            </a>
-          </template>
-        </el-table-column>
-        
-        <!-- 摘要列 -->
-        <el-table-column prop="note" label="摘要" min-width="300">
-          <template #default="{ row }">
-            <span class="link-note">{{ row.note || '-' }}</span>
-          </template>
-        </el-table-column>
-        
-        <!-- 操作列 -->
-        <el-table-column label="操作" width="120" fixed="right">
-          <template #default="{ row }">
-            <div class="link-actions">
-              <!-- 编辑按钮 -->
-              <el-button
-                type="primary"
-                link
-                @click="showDialog(row)"
-                class="edit-button"
-              >
-                编辑
-              </el-button>
-              <!-- 删除按钮 -->
-              <el-button
-                type="danger"
-                link
-                @click="confirmDelete(row)"
-                class="delete-button"
-              >
-                删除
-              </el-button>
-            </div>
-          </template>
-        </el-table-column>
+        <!-- ... existing table columns ... -->
       </el-table>
     </div>
 
-    <!-- 添加/编辑链接对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="editingLink ? '编辑链接' : '添加链接'"
-      width="50%"
-      :max-width="600"
-      class="link-dialog"
-      destroy-on-close
-    >
-      <!-- 表单 -->
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-position="top"
-        class="link-form"
-      >
-        <!-- 链接输入框 -->
-        <el-form-item label="链接" prop="url">
-          <div class="url-input-container">
-            <el-input 
-              v-model="form.url" 
-              placeholder="请输入链接地址 (可选)"
-              :prefix-icon="Link"
-              class="url-input"
-            />
-          </div>
-        </el-form-item>
-        <!-- 标题输入框 -->
-        <el-form-item label="标题" prop="title">
-          <el-input 
-            v-model="form.title" 
-            placeholder="请输入链接标题"
-            :prefix-icon="Document"
-            class="form-input"
-          />
-        </el-form-item>
-        <!-- 摘要输入框 -->
-        <el-form-item label="摘要" prop="note">
-          <el-input
-            v-model="form.note"
-            type="textarea"
-            :rows="8"
-            placeholder="请输入摘要"
-            class="form-input textarea-input"
-          />
-        </el-form-item>
-      </el-form>
-      <!-- 对话框底部按钮 -->
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
-            确定
-          </el-button>
-        </span>
-      </template>
-    </el-dialog>
+    <!-- ... existing dialog ... -->
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, nextTick } from 'vue'; // 导入 nextTick
+import { ref, reactive, onMounted, watch, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Link, Document } from '@element-plus/icons-vue';
 import { useFolderStore } from '@/stores/folder';
@@ -175,21 +54,8 @@ const rules = {
   title: [
     { required: true, message: '请输入链接标题', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
-  ],
-  url: [
-    { type: 'url', message: '请输入有效的链接地址或留空', trigger: ['blur', 'change'] }
-  ],
-  note: [
-    { validator: (rule, value, callback) => {
-        if (!form.url && !value) {
-          callback(new Error('请输入摘要内容，或提供一个链接地址'));
-        } else {
-          callback();
-        }
-      },
-      trigger: ['blur', 'change']
-    }
   ]
+  // ... existing rules ...
 };
 
 const extractUrlFromText = (text) => {
@@ -217,12 +83,9 @@ const handleSubmit = async () => {
   if (!formRef.value || isSubmitting.value) return;
   
   try {
-    const valid = await formRef.value.validate().catch(() => false);
-    if (!valid) return;
-    
-    isSubmitting.value = true;
+    await formRef.value.validate();
     loading.value = true;
-    
+
     const isEditing = !!editingLink.value;
     const linkId = isEditing ? editingLink.value._id : null;
     
@@ -235,15 +98,15 @@ const handleSubmit = async () => {
     const urlPattern = /^(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))?$/;
     if (formData.url && !urlPattern.test(formData.url)) {
       ElMessage.warning('您输入的URL格式不正确，请检查或留空');
-      isSubmitting.value = false;
       loading.value = false;
+      isSubmitting.value = false;
       return;
     }
 
     if (!formData.url && !formData.note) {
       ElMessage.warning('请输入链接地址或填写摘要内容');
-      isSubmitting.value = false;
       loading.value = false;
+      isSubmitting.value = false;
       return;
     }
     
@@ -251,7 +114,7 @@ const handleSubmit = async () => {
     if (isEditing) {
       result = await folderStore.updateLink(linkId, formData);
     } else {
-      result = await folderStore.addLink(formData); // addLink now takes only linkData
+      result = await folderStore.addLink(formData);
     }
 
     if (result.success) {
@@ -278,28 +141,37 @@ const confirmDelete = (link) => {
     }
   ).then(async () => {
     const result = await folderStore.deleteLink(link._id);
-    if (result.success) {
-      // Links are automatically updated by the store
+    if (!result.success) {
+      ElMessage.error(result.message);
     }
   }).catch(() => {
     // User cancelled deletion
   });
 };
 
-watch(() => props.folderId, async (newFolderId) => { // 将 watcher 设为 async
+// 监听 props.folderId 变化，当选中文件夹改变时，重新获取链接
+watch(() => props.folderId, async (newFolderId) => {
   if (newFolderId) {
-    await folderStore.fetchLinksByFolder(newFolderId); // 等待数据获取完成
-    // 在数据更新并 DOM 渲染完成后，强制 el-table 重新布局
+    await folderStore.fetchLinksByFolder(newFolderId);
+    // 这里的 doLayout 仍然保留，以防万一
     nextTick(() => {
       if (linkTableRef.value) {
         linkTableRef.value.doLayout();
       }
     });
-  } else {
-    // If no folder is selected, ensure currentFolderLinks is empty
-    // This is handled by the getter, but you might want to explicitly clear cache if needed
   }
 }, { immediate: true });
+
+// 新增：监听 loadingLinks 状态，在加载完成后强制 el-table 重新布局
+watch(() => folderStore.loadingLinks, (newVal, oldVal) => {
+  if (oldVal === true && newVal === false) { // 从加载中变为加载完成
+    nextTick(() => {
+      if (linkTableRef.value) {
+        linkTableRef.value.doLayout();
+      }
+    });
+  }
+});
 
 onMounted(() => {
   // 在组件挂载时，如果表格已经存在，也强制进行一次布局
